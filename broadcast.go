@@ -2,22 +2,19 @@ package broadcast
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 	"unsafe"
 )
 
 type (
-	// SignalBroadcast implementation
 	SignalBroadcast struct {
-		L sync.Locker
 		n unsafe.Pointer
 	}
 )
 
 // NewSignalBroadcast constructor
-func NewSignalBroadcast(l sync.Locker) *SignalBroadcast {
-	b := &SignalBroadcast{L: l}
+func NewSignalBroadcast() *SignalBroadcast {
+	b := &SignalBroadcast{}
 	n := make(chan struct{})
 	b.n = unsafe.Pointer(&n)
 	return b
@@ -25,21 +22,18 @@ func NewSignalBroadcast(l sync.Locker) *SignalBroadcast {
 
 // Wait for Broadcast() calls
 func (b *SignalBroadcast) Wait() {
-	n := b.WaitChan()
-	b.L.Unlock()
-	<-n
-	b.L.Lock()
+	<-b.WaitChan()
 }
 
 // WaitCtx same as Wait() call but with a given context
-func (b *SignalBroadcast) WaitCtx(ctx context.Context) {
+func (b *SignalBroadcast) WaitCtx(ctx context.Context) error {
 	n := b.WaitChan()
-	b.L.Unlock()
 	select {
 	case <-n:
+		return nil
 	case <-ctx.Done():
+		return ctx.Err()
 	}
-	b.L.Lock()
 }
 
 // WaitChan returns a channel that can be used to wait for next Broadcast() call

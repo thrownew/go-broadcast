@@ -7,64 +7,59 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestUnitSignalBroadcast check
 func TestUnitSignalBroadcast(t *testing.T) {
-	t.Run(`wait`, func(t *testing.T) {
-		x := 0
-		b := NewSignalBroadcast(&sync.Mutex{})
-		done := make(chan bool)
+	t.Run(`wait`, func(_ *testing.T) {
+		var x atomic.Int32
+		b := NewSignalBroadcast()
+		var wg sync.WaitGroup
+		wg.Add(4)
 		go func() {
-			b.L.Lock()
-			x = 1
-			b.Wait()
-			require.Equal(t, 2, x, "expected 2")
-			x = 3
-			b.Broadcast()
-			b.L.Unlock()
-			done <- true
+			defer wg.Done()
+			for {
+				if x.CompareAndSwap(0, 1) {
+					b.Wait()
+					break
+				}
+				runtime.Gosched()
+			}
 		}()
 		go func() {
-			b.L.Lock()
+			defer wg.Done()
 			for {
-				if x == 1 {
-					x = 2
+				if x.CompareAndSwap(1, 2) {
+					b.Wait()
+					break
+				}
+				runtime.Gosched()
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for {
+				if x.CompareAndSwap(2, 3) {
 					b.Broadcast()
 					break
 				}
-				b.L.Unlock()
 				runtime.Gosched()
-				b.L.Lock()
 			}
-			b.L.Unlock()
-			done <- true
 		}()
 		go func() {
-			b.L.Lock()
+			defer wg.Done()
 			for {
-				if x == 2 {
-					b.Wait()
-					require.Equal(t, 3, x, "expected 3")
+				if x.CompareAndSwap(3, 4) {
+					b.Broadcast()
 					break
 				}
-				if x == 3 {
-					break
-				}
-				b.L.Unlock()
 				runtime.Gosched()
-				b.L.Lock()
 			}
-			b.L.Unlock()
-			done <- true
 		}()
-		<-done
-		<-done
-		<-done
+		wg.Wait()
 	})
 	t.Run(`wait chan`, func(t *testing.T) {
-		b := NewSignalBroadcast(&sync.Mutex{})
+		b := NewSignalBroadcast()
 		var ready, done sync.WaitGroup
 		var cnt int32
 		for i := 0; i < 8; i++ {
@@ -89,7 +84,7 @@ func TestUnitSignalBroadcast(t *testing.T) {
 // BenchmarkBroadcastSignalBroadcast check
 func BenchmarkBroadcastSignalBroadcast(b *testing.B) {
 	b.ReportAllocs()
-	br := NewSignalBroadcast(&sync.Mutex{})
+	br := NewSignalBroadcast()
 	stop := make(chan struct{})
 	var ready, done sync.WaitGroup
 	for i := 0; i < 100; i++ {

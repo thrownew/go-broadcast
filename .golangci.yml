@@ -5,35 +5,18 @@ run:
   tests: true
 
 output:
-  format: colored-line-number
+  formats: colored-line-number
   print-issued-lines: true
   print-linter-name: true
 
 linters-settings:
   govet:
-    check-shadowing: true
+    shadow: enable-all
   gofmt:
     simplify: true
   errcheck:
     check-type-assertions: true
-    check-blank: false
   gocyclo:
     min-complexity: 10
   misspell:
     locale: US
-
-linters:
-  disable-all: true
-  enable:
-    - govet
-    - revive
-    - gofmt
-    - errcheck
-    - misspell
-    - gocyclo
-    - ineffassign
-    - goimports
-    - nakedret
-    - unparam
-    - unused
-  fast: false
